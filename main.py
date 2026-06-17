@@ -20,15 +20,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = user.id
     username = user.username or ''
     ref_id = context.args[0] if context.args else None
-
     try:
         member = await context.bot.get_chat_member(CHANNEL_ID, uid)
         is_member = member.status in ['member','administrator','creator']
     except:
         is_member = False
-
     result = supabase.table('users').select('*').eq('telegram_id', uid).execute()
-
     if not result.data:
         supabase.table('users').insert({
             'telegram_id': uid,
@@ -40,7 +37,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'referred_by': ref_id,
             'is_member': is_member
         }).execute()
-
         if ref_id and ref_id != str(uid) and is_member:
             ref_result = supabase.table('users').select('*').eq('telegram_id', int(ref_id)).execute()
             if ref_result.data:
@@ -48,16 +44,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     'coins': (ref_result.data[0]['coins'] or 0) + 100,
                     'refs': (ref_result.data[0]['refs'] or 0) + 1
                 }).eq('telegram_id', int(ref_id)).execute()
-
     if not is_member:
         keyboard = [
             [InlineKeyboardButton("📢 اشترك في القناة", url=f"https://t.me/{CHANNEL_ID.replace('@','')}")],
             [InlineKeyboardButton("✅ تحققت من الاشتراك", callback_data='verify')]
         ]
         await update.message.reply_text(
-            "⚠️ لازم تشترك في القناة الأول!\n\n"
-            "1️⃣ اشترك في القناة\n"
-            "2️⃣ ارجع هنا واضغط تحققت",
+            "⚠️ لازم تشترك في القناة الأول!\n\n1️⃣ اشترك في القناة\n2️⃣ ارجع هنا واضغط تحققت",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     else:
@@ -74,10 +67,7 @@ async def show_menu(message, uid):
         [InlineKeyboardButton("📊 إحصائياتك", callback_data='stats')]
     ]
     await message.reply_text(
-        f"👋 أهلاً!\n\n"
-        f"🪙 رصيدك: {coins} نقطة\n"
-        f"👥 إحالاتك: {refs}\n\n"
-        f"افتح التطبيق واكسب! 👇",
+        f"👋 أهلاً!\n\n🪙 رصيدك: {coins} نقطة\n👥 إحالاتك: {refs}\n\nافتح التطبيق واكسب! 👇",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -85,14 +75,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     uid = query.from_user.id
-
     if query.data == 'verify':
         try:
             member = await context.bot.get_chat_member(CHANNEL_ID, uid)
             is_member = member.status in ['member','administrator','creator']
         except:
             is_member = False
-
         if is_member:
             result = supabase.table('users').select('*').eq('telegram_id', uid).execute()
             if result.data and not result.data[0].get('is_member'):
@@ -105,7 +93,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             'coins': (ref_result.data[0]['coins'] or 0) + 100,
                             'refs': (ref_result.data[0]['refs'] or 0) + 1
                         }).eq('telegram_id', int(ref_id)).execute()
-
             result = supabase.table('users').select('*').eq('telegram_id', uid).execute()
             coins = result.data[0]['coins'] if result.data else 0
             refs = result.data[0]['refs'] if result.data else 0
@@ -116,10 +103,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 [InlineKeyboardButton("📊 إحصائياتك", callback_data='stats')]
             ]
             await query.edit_message_text(
-                f"✅ تم التحقق! أهلاً بك!\n\n"
-                f"🪙 رصيدك: {coins} نقطة\n"
-                f"👥 إحالاتك: {refs}\n\n"
-                f"افتح التطبيق! 👇",
+                f"✅ تم التحقق! أهلاً بك!\n\n🪙 رصيدك: {coins} نقطة\n👥 إحالاتك: {refs}\n\nافتح التطبيق! 👇",
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
         else:
@@ -130,7 +114,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     [InlineKeyboardButton("✅ تحققت من الاشتراك", callback_data='verify')]
                 ])
             )
-
     elif query.data == 'referral':
         ref_link = f"https://t.me/earntaskpro_bot?start={uid}"
         await query.edit_message_text(
@@ -138,7 +121,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='Markdown',
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data='back')]])
         )
-
     elif query.data == 'balance':
         result = supabase.table('users').select('*').eq('telegram_id', uid).execute()
         coins = result.data[0]['coins'] if result.data else 0
@@ -146,7 +128,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🪙 رصيدك: {coins} نقطة\n💵 ≈ {coins*0.0001:.4f} USDT\n\n1000 نقطة = 0.1 USDT",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data='back')]])
         )
-
     elif query.data == 'stats':
         result = supabase.table('users').select('*').eq('telegram_id', uid).execute()
         refs = result.data[0]['refs'] if result.data else 0
@@ -155,7 +136,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📊 إحصائياتك:\n\n👥 إحالات: {refs}\n📺 إعلانات: {ads}\n💰 من الإحالات: {refs*100} نقطة",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data='back')]])
         )
-
     elif query.data == 'back':
         result = supabase.table('users').select('*').eq('telegram_id', uid).execute()
         coins = result.data[0]['coins'] if result.data else 0
