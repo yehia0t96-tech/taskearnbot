@@ -1,10 +1,10 @@
 import os
 import asyncio
+import json
 from http.server import BaseHTTPRequestHandler
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 from supabase import create_client
-import json
 
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 SUPABASE_URL = os.getenv('SUPABASE_URL')
@@ -13,7 +13,7 @@ CHANNEL_ID = os.getenv('CHANNEL_ID', '@gxhxd')
 MINI_APP_URL = 'https://t.me/earntaskpro_bot/TaskEarn'
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-app_bot = Application.builder().token(BOT_TOKEN).build()
+bot_app = Application.builder().token(BOT_TOKEN).build()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -23,7 +23,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         member = await context.bot.get_chat_member(CHANNEL_ID, uid)
-        is_member = member.status in ['member', 'administrator', 'creator']
+        is_member = member.status in ['member','administrator','creator']
     except:
         is_member = False
 
@@ -55,13 +55,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("✅ تحققت من الاشتراك", callback_data='verify')]
         ]
         await update.message.reply_text(
-            "⚠️ لازم تشترك في القناة الأول!\n\n1️⃣ اشترك\n2️⃣ ارجع واضغط تحققت",
+            "⚠️ لازم تشترك في القناة الأول!\n\n"
+            "1️⃣ اشترك في القناة\n"
+            "2️⃣ ارجع هنا واضغط تحققت",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     else:
-        await show_menu(update.message, uid, context)
+        await show_menu(update.message, uid)
 
-async def show_menu(message, uid, context):
+async def show_menu(message, uid):
     result = supabase.table('users').select('*').eq('telegram_id', uid).execute()
     coins = result.data[0]['coins'] if result.data else 0
     refs = result.data[0]['refs'] if result.data else 0
@@ -69,10 +71,13 @@ async def show_menu(message, uid, context):
         [InlineKeyboardButton("🚀 فتح التطبيق", url=MINI_APP_URL)],
         [InlineKeyboardButton(f"🪙 رصيدك: {coins} نقطة", callback_data='balance')],
         [InlineKeyboardButton("👥 رابط الإحالة", callback_data='referral')],
-        [InlineKeyboardButton(f"📊 إحصائياتك", callback_data='stats')]
+        [InlineKeyboardButton("📊 إحصائياتك", callback_data='stats')]
     ]
     await message.reply_text(
-        f"👋 أهلاً!\n\n🪙 رصيدك: {coins} نقطة\n👥 إحالاتك: {refs}\n\nافتح التطبيق واكسب! 👇",
+        f"👋 أهلاً!\n\n"
+        f"🪙 رصيدك: {coins} نقطة\n"
+        f"👥 إحالاتك: {refs}\n\n"
+        f"افتح التطبيق واكسب! 👇",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -84,7 +89,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data == 'verify':
         try:
             member = await context.bot.get_chat_member(CHANNEL_ID, uid)
-            is_member = member.status in ['member', 'administrator', 'creator']
+            is_member = member.status in ['member','administrator','creator']
         except:
             is_member = False
 
@@ -111,7 +116,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 [InlineKeyboardButton("📊 إحصائياتك", callback_data='stats')]
             ]
             await query.edit_message_text(
-                f"✅ تم التحقق!\n\n🪙 رصيدك: {coins} نقطة\n👥 إحالاتك: {refs}\n\nافتح التطبيق! 👇",
+                f"✅ تم التحقق! أهلاً بك!\n\n"
+                f"🪙 رصيدك: {coins} نقطة\n"
+                f"👥 إحالاتك: {refs}\n\n"
+                f"افتح التطبيق! 👇",
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
         else:
@@ -126,7 +134,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == 'referral':
         ref_link = f"https://t.me/earntaskpro_bot?start={uid}"
         await query.edit_message_text(
-            f"👥 رابط الإحالة بتاعك:\n\n`{ref_link}`\n\n🎁 100 نقطة لكل صديق!",
+            f"👥 رابط الإحالة بتاعك:\n\n`{ref_link}`\n\n🎁 100 نقطة لكل صديق ينضم!",
             parse_mode='Markdown',
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data='back')]])
         )
@@ -135,7 +143,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         result = supabase.table('users').select('*').eq('telegram_id', uid).execute()
         coins = result.data[0]['coins'] if result.data else 0
         await query.edit_message_text(
-            f"🪙 رصيدك: {coins} نقطة\n💵 ≈ {coins*0.0001:.4f} USDT",
+            f"🪙 رصيدك: {coins} نقطة\n💵 ≈ {coins*0.0001:.4f} USDT\n\n1000 نقطة = 0.1 USDT",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data='back')]])
         )
 
@@ -163,15 +171,15 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
-app_bot.add_handler(CommandHandler("start", start))
-app_bot.add_handler(CallbackQueryHandler(button_handler))
+bot_app.add_handler(CommandHandler("start", start))
+bot_app.add_handler(CallbackQueryHandler(button_handler))
 
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         content_length = int(self.headers['Content-Length'])
         body = self.rfile.read(content_length)
-        update = Update.de_json(json.loads(body), app_bot.bot)
-        asyncio.run(app_bot.process_update(update))
+        update = Update.de_json(json.loads(body.decode()), bot_app.bot)
+        asyncio.run(bot_app.process_update(update))
         self.send_response(200)
         self.end_headers()
 
