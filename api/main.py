@@ -36,6 +36,48 @@ async def db_update(table, field, value, data):
             json=data
         )
 
+async def check_member(bot, uid):
+    try:
+        member = await bot.get_chat_member(CHANNEL_ID, uid)
+        return member.status in ['member','administrator','creator','restricted']
+    except:
+        return False
+
+async def give_ref_bonus(ref_id, uid):
+    if not ref_id or str(ref_id) == str(uid):
+        return
+    try:
+        ref_data = await db_get('users', 'telegram_id', int(ref_id))
+        if ref_data:
+            await db_update('users', 'telegram_id', int(ref_id), {
+                'coins': (ref_data[0]['coins'] or 0) + 100,
+                'refs': (ref_data[0]['refs'] or 0) + 1
+            })
+    except:
+        pass
+
+async def get_menu_keyboard(uid):
+    result = await db_get('users', 'telegram_id', uid)
+    coins = result[0]['coins'] if result else 0
+    refs = result[0]['refs'] if result else 0
+    ads = result[0]['ads_watched'] if result else 0
+    usdt = coins * 0.0001
+    text = (
+        f"👋 أهلاً بك في TaskEarn!\n\n"
+        f"🪙 رصيدك: {coins} نقطة\n"
+        f"💵 ≈ {usdt:.4f} USDT\n"
+        f"👥 إحالاتك: {refs}\n"
+        f"📺 إعلانات: {ads}\n\n"
+        f"افتح التطبيق واكسب أكتر! 👇"
+    )
+    keyboard = [
+        [InlineKeyboardButton("🚀 فتح التطبيق", url=MINI_APP_URL)],
+        [InlineKeyboardButton(f"🪙 رصيدك: {coins} نقطة", callback_data='balance')],
+        [InlineKeyboardButton("👥 رابط الإحالة", callback_data='referral'),
+         InlineKeyboardButton("📊 إحصائياتك", callback_data='stats')]
+    ]
+    return text, InlineKeyboardMarkup(keyboard)
+
 async def process_update(update_data):
     app = Application.builder().token(BOT_TOKEN).build()
 
@@ -44,12 +86,9 @@ async def process_update(update_data):
         uid = user.id
         username = user.username or ''
         ref_id = context.args[0] if context.args else None
-        try:
-            member = await context.bot.get_chat_member(CHANNEL_ID, uid)
-            is_member = member.status in ['member','administrator','creator']
-        except:
-            is_member = False
+        is_member = await check_member(context.bot, uid)
         result = await db_get('users', 'telegram_id', uid)
+
         if not result:
             await db_insert('users', {
                 'telegram_id': uid,
@@ -58,119 +97,97 @@ async def process_update(update_data):
                 'ads_watched': 0,
                 'tasks_done': 0,
                 'refs': 0,
-                'referred_by': ref_id,
-                'is_member': is_member
+                'referred_by': str(ref_id) if ref_id else None,
+                'is_member': is_member,
+                'channel_bonus': False
             })
-            if ref_id and ref_id != str(uid) and is_member:
-                ref_data = await db_get('users', 'telegram_id', ref_id)
-                if ref_data:
-                    await db_update('users', 'telegram_id', ref_id, {
-                        'coins': (ref_data[0]['coins'] or 0) + 100,
-                        'refs': (ref_data[0]['refs'] or 0) + 1
-                    })
+            if is_member and ref_id:
+                await give_ref_bonus(ref_id, uid)
+                await db_update('users', 'telegram_id', uid, {'channel_bonus': True, 'is_member': True})
+        else:
+            if is_member and not result[0].get('channel_bonus'):
+                stored_ref = result[0].get('referred_by')
+                await give_ref_bonus(stored_ref, uid)
+                await db_update('users', 'telegram_id', uid, {'is_member': True, 'channel_bonus': True})
+
         if not is_member:
             keyboard = [
-                [InlineKeyboardButton("📢 اشترك في القناة", url=f"https://t.me/{CHANNEL_ID.replace('@','')}")],
-                [InlineKeyboardButton("✅ تحققت من الاشتراك", callback_data='verify')]
+                [InlineKeyboardButton("📢 اشترك في قناة TaskEarn", url=f"https://t.me/{CHANNEL_ID.replace('@','')}")],
+                [InlineKeyboardButton("✅ تحقق من الاشتراك", callback_data='verify')]
             ]
             await update.message.reply_text(
-                "⚠️ لازم تشترك في القناة الأول!\n\n1️⃣ اشترك\n2️⃣ ارجع واضغط تحققت",
+                "🎯 أهلاً بك في TaskEarn Bot!\n\n"
+                "💰 اكسب نقاط وحوّلها لـ USDT\n"
+                "👥 100 نقطة لكل صديق تدعوه\n"
+                "📺 نقاط على كل إعلان\n\n"
+                "⚠️ اشترك في القناة للبدء:",
                 reply_markup=InlineKeyboardMarkup(keyboard)
             )
         else:
-            result = await db_get('users', 'telegram_id', uid)
-            coins = result[0]['coins'] if result else 0
-            refs = result[0]['refs'] if result else 0
-            keyboard = [
-                [InlineKeyboardButton("🚀 فتح التطبيق", url=MINI_APP_URL)],
-                [InlineKeyboardButton(f"🪙 رصيدك: {coins} نقطة", callback_data='balance')],
-                [InlineKeyboardButton("👥 رابط الإحالة", callback_data='referral')],
-                [InlineKeyboardButton("📊 إحصائياتك", callback_data='stats')]
-            ]
-            await update.message.reply_text(
-                f"👋 أهلاً!\n\n🪙 رصيدك: {coins} نقطة\n👥 إحالاتك: {refs}\n\nافتح التطبيق! 👇",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
+            text, markup = await get_menu_keyboard(uid)
+            await update.message.reply_text(text, reply_markup=markup)
 
     async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
         await query.answer()
         uid = query.from_user.id
+
         if query.data == 'verify':
-            try:
-                member = await context.bot.get_chat_member(CHANNEL_ID, uid)
-                is_member = member.status in ['member','administrator','creator']
-            except:
-                is_member = False
+            is_member = await check_member(context.bot, uid)
             if is_member:
                 result = await db_get('users', 'telegram_id', uid)
-                if result and not result[0].get('is_member'):
-                    ref_id = result[0].get('referred_by')
-                    await db_update('users', 'telegram_id', uid, {'is_member': True})
-                    if ref_id:
-                        ref_data = await db_get('users', 'telegram_id', ref_id)
-                        if ref_data:
-                            await db_update('users', 'telegram_id', ref_id, {
-                                'coins': (ref_data[0]['coins'] or 0) + 100,
-                                'refs': (ref_data[0]['refs'] or 0) + 1
-                            })
-                result = await db_get('users', 'telegram_id', uid)
-                coins = result[0]['coins'] if result else 0
-                refs = result[0]['refs'] if result else 0
+                if result and not result[0].get('channel_bonus'):
+                    stored_ref = result[0].get('referred_by')
+                    await give_ref_bonus(stored_ref, uid)
+                    await db_update('users', 'telegram_id', uid, {'is_member': True, 'channel_bonus': True})
+                text, markup = await get_menu_keyboard(uid)
+                await query.edit_message_text(text, reply_markup=markup)
+            else:
                 keyboard = [
-                    [InlineKeyboardButton("🚀 فتح التطبيق", url=MINI_APP_URL)],
-                    [InlineKeyboardButton(f"🪙 رصيدك: {coins} نقطة", callback_data='balance')],
-                    [InlineKeyboardButton("👥 رابط الإحالة", callback_data='referral')],
-                    [InlineKeyboardButton("📊 إحصائياتك", callback_data='stats')]
+                    [InlineKeyboardButton("📢 اشترك في قناة TaskEarn", url=f"https://t.me/{CHANNEL_ID.replace('@','')}")],
+                    [InlineKeyboardButton("✅ تحقق من الاشتراك", callback_data='verify')]
                 ]
                 await query.edit_message_text(
-                    f"✅ تم التحقق!\n\n🪙 رصيدك: {coins} نقطة\n👥 إحالاتك: {refs}\n\nافتح التطبيق! 👇",
+                    "❌ لسه مشتركتش!\n\nاشترك في القناة الأول وبعدين اضغط تحقق",
                     reply_markup=InlineKeyboardMarkup(keyboard)
                 )
-            else:
-                await query.edit_message_text(
-                    "❌ لسه مشتركتش!\n\nاشترك الأول وارجع اضغط تحققت",
-                    reply_markup=InlineKeyboardMarkup([
-                        [InlineKeyboardButton("📢 اشترك في القناة", url=f"https://t.me/{CHANNEL_ID.replace('@','')}")],
-                        [InlineKeyboardButton("✅ تحققت من الاشتراك", callback_data='verify')]
-                    ])
-                )
+
         elif query.data == 'referral':
             ref_link = f"https://t.me/earntaskpro_bot?start={uid}"
             await query.edit_message_text(
-                f"👥 رابط الإحالة:\n\n`{ref_link}`\n\n🎁 100 نقطة لكل صديق!",
+                f"👥 رابط الإحالة بتاعك:\n\n`{ref_link}`\n\n🎁 100 نقطة لكل صديق ينضم!",
                 parse_mode='Markdown',
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data='back')]])
             )
+
         elif query.data == 'balance':
             result = await db_get('users', 'telegram_id', uid)
             coins = result[0]['coins'] if result else 0
+            usdt = coins * 0.0001
             await query.edit_message_text(
-                f"🪙 رصيدك: {coins} نقطة\n💵 ≈ {coins*0.0001:.4f} USDT",
+                f"🪙 رصيدك: {coins} نقطة\n"
+                f"💵 ≈ {usdt:.4f} USDT\n\n"
+                f"1000 نقطة = 0.1 USDT",
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data='back')]])
             )
+
         elif query.data == 'stats':
             result = await db_get('users', 'telegram_id', uid)
             refs = result[0]['refs'] if result else 0
             ads = result[0]['ads_watched'] if result else 0
+            coins = result[0]['coins'] if result else 0
             await query.edit_message_text(
-                f"📊 إحصائياتك:\n\n👥 إحالات: {refs}\n📺 إعلانات: {ads}",
+                f"📊 إحصائياتك:\n\n"
+                f"👥 إحالات: {refs}\n"
+                f"📺 إعلانات: {ads}\n"
+                f"🪙 إجمالي النقاط: {coins}\n"
+                f"💰 من الإحالات: {refs*100} نقطة",
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data='back')]])
             )
+
         elif query.data == 'back':
-            result = await db_get('users', 'telegram_id', uid)
-            coins = result[0]['coins'] if result else 0
-            refs = result[0]['refs'] if result else 0
-            keyboard = [
-                [InlineKeyboardButton("🚀 فتح التطبيق", url=MINI_APP_URL)],
-                [InlineKeyboardButton(f"🪙 رصيدك: {coins} نقطة", callback_data='balance')],
-                [InlineKeyboardButton("👥 رابط الإحالة", callback_data='referral')],
-                [InlineKeyboardButton("📊 إحصائياتك", callback_data='stats')]
-            ]
-            await query.edit_message_text(
-                f"👋 أهلاً!\n\n🪙 رصيدك: {coins} نقطة\n👥 إحالاتك: {refs}\n\nافتح التطبيق! 👇",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
+            text, markup = await get_menu_keyboard(uid)
+            await query.edit_message_text(text, reply_markup=markup)
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
