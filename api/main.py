@@ -1,12 +1,11 @@
 import os
 import asyncio
 import json
-from flask import Flask, request, jsonify
+from http.server import BaseHTTPRequestHandler
+from urllib.parse import urlparse, parse_qs
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Bot
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 import httpx
-
-app = Flask(__name__)
 
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 SUPABASE_URL = os.getenv('SUPABASE_URL')
@@ -19,8 +18,6 @@ HEADERS = lambda: {
     "Authorization": f"Bearer {SUPABASE_KEY}",
     "Content-Type": "application/json"
 }
-
-# ─── Database ───────────────────────────────────────────
 
 async def db_get(table, field, value):
     async with httpx.AsyncClient() as client:
@@ -45,8 +42,6 @@ async def db_update(table, field, value, data):
             headers=HEADERS(),
             json=data
         )
-
-# ─── Helpers ────────────────────────────────────────────
 
 async def check_member(bot, uid):
     try:
@@ -98,8 +93,6 @@ async def get_menu(uid):
     ]
     return text, InlineKeyboardMarkup(keyboard)
 
-# ─── Verify Channel ─────────────────────────────────────
-
 async def api_verify_channel(uid):
     bot = Bot(token=BOT_TOKEN)
     try:
@@ -125,8 +118,6 @@ async def api_verify_channel(uid):
         return {"ok": False, "msg": str(e)}
     finally:
         await bot.close()
-
-# ─── Bot Handlers ────────────────────────────────────────
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -214,71 +205,53 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(text, reply_markup=markup)
 
 async def process_update(update_data):
-    application = Application.builder().token(BOT_TOKEN).build()
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(button_handler))
-    async with application:
-        update = Update.de_json(update_data, application.bot)
-        await application.process_update(update)
+    app = Application.builder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(button_handler))
+    async with app:
+        update = Update.de_json(update_data, app.bot)
+        await app.process_update(update)
 
-# ─── Flask Routes ────────────────────────────────────────
+class handler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        try:
+            content_length = int(self.headers['Content-Length'])
+            body = self.rfile.read(content_length)
+            update_data = json.loads(body.decode())
+            asyncio.run(process_update(update_data))
+            self.send_response(200)
+        except Exception as e:
+            print(f"[Handler Error] {e}")
+            self.send_response(500)
+        finally:
+            self.end_headers()
 
-@app.route('/', defaults={'path': ''})
-@app.route('/<path:path>')
-def serve_static(path):
-    if path == '' or path == 'index.html':
-        return app.send_static_file('index.html')
-    return app.send_static_file(path)
+    def do_GET(self):
+        parsed = urlparse(self.path)
+        params = parse_qs(parsed.query)
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
 
-@app.route('/api/webhook', methods=['POST'])
-def webhook():
-    data = request.get_json()
-    asyncio.run(process_update(data))
-    return jsonify({"ok": True})
+        if parsed.path == '/api/verify':
+            uid = params.get('uid', [None])[0]
+            if not uid:
+                self.wfile.write(b'{"ok":false,"msg":"missing uid"}')
+                return
+            result = asyncio.run(api_verify_channel(uid))
+            self.wfile.write(json.dumps(result).encode())
+            return
 
-@app.route('/api/verify', methods=['GET'])
-def verify():
-    uid = request.args.get('uid')
-    if not uid:
-        return jsonify({"ok": False, "msg": "missing uid"})
-    result = asyncio.run(api_verify_channel(uid))
-    response = jsonify(result)
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    return response
+        if parsed.path == '/api/fix-refs':
+            self.wfile.write(b'{"ok":true}')
+            return
 
-@app.route('/api/fix-refs', methods=['GET'])
-def fix_refs():
-    async def _fix():
-        async with httpx.AsyncClient() as client:
-            r = await client.get(
-                f"{SUPABASE_URL}/rest/v1/users?referred_by=not.is.null&select=*",
-                headers=HEADERS()
-            )
-            users = r.json()
-        fixed = 0
-        for user in users:
-            ref_id = user.get('referred_by')
-            uid = user.get('telegram_id')
-            if not ref_id or str(ref_id) == str(uid):
-                continue
-            ref_data = await get_user(int(ref_id))
-            if ref_data:
-                async with httpx.AsyncClient() as client:
-                    r2 = await client.get(
-                        f"{SUPABASE_URL}/rest/v1/users?referred_by=eq.{ref_id}&select=telegram_id",
-                        headers=HEADERS()
-                    )
-                    actual_refs = len(r2.json())
-                current_refs = ref_data.get('refs', 0)
-                if actual_refs != current_refs:
-                    await db_update('users', 'telegram_id', int(ref_id), {
-                        'refs': actual_refs,
-                        'coins': (ref_data.get('coins') or 0) + ((actual_refs - current_refs) * 100)
-                    })
-                    fixed += 1
-        return fixed
-    fixed = asyncio.run(_fix())
-    return jsonify({"ok": True, "fixed": fixed})
+        self.wfile.write(b'{"ok":true,"msg":"TaskEarn Bot Running!"}')
 
-if __name__ == '__main__':
-    app.run()
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
