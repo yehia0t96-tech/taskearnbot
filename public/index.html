@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TaskEarn</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Arial,sans-serif;background:#0e0e0e;color:#fff;min-height:100vh;overflow-x:hidden}
+:root{--gold:#f5a623;--gold2:#f8c55d;--dark:#0e0e0e;--card:#1a1a1a;--card2:#222;--border:#2a2a2a}
+@keyframes rgbSoft{0%{color:#f5a623}25%{color:#7ed6df}50%{color:#a29bfe}75%{color:#55efc4}100%{color:#f5a623}}
+@keyframes glowSoft{0%{box-shadow:0 0 12px rgba(245,166,35,0.2)}50%{box-shadow:0 0 12px rgba(162,155,254,0.2)}100%{box-shadow:0 0 12px rgba(245,166,35,0.2)}}
+@keyframes borderSoft{0%{border-color:rgba(245,166,35,0.3)}50%{border-color:rgba(162,155,254,0.3)}100%{border-color:rgba(245,166,35,0.3)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideLeft{from{transform:translateX(100%)}to{transform:translateX(-100%)}}
+@keyframes notifIn{from{top:-60px;opacity:0}to{top:16px;opacity:1}}
+.page{display:none;padding:14px;padding-bottom:85px;animation:fadeIn 0.25s ease}
+.page.active{display:block}
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;background:var(--card);border-bottom:1px solid var(--border);margin-bottom:14px;border-radius:0 0 16px 16px}
+.logo{font-size:17px;font-weight:800;color:var(--gold)}
+.logo span{animation:rgbSoft 4s infinite}
+.id-chip{background:var(--card2);padding:5px 11px;border-radius:20px;font-size:11px;color:rgba(255,255,255,0.4)}
+.hero{text-align:center;padding:20px 16px 8px}
+.coin-wrap{display:inline-block;animation:float 3s ease-in-out infinite}
+.coin-ico{font-size:68px;filter:drop-shadow(0 4px 16px rgba(245,166,35,0.4))}
+.coin-num{font-size:46px;font-weight:800;color:var(--gold);margin-top:4px;letter-spacing:-1px}
+.coin-usdt{font-size:13px;color:rgba(255,255,255,0.3);margin-top:2px}
+.prog-wrap{margin:14px 24px 0;background:var(--card2);border-radius:6px;height:4px;overflow:hidden}
+.prog{height:100%;border-radius:6px;background:linear-gradient(90deg,var(--gold),var(--gold2));transition:width 0.6s ease}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:10px 14px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 8px;text-align:center}
+.stat-n{font-size:20px;font-weight:700;color:var(--gold)}
+.stat-l{font-size:10px;color:rgba(255,255,255,0.35);margin-top:2px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:15px;margin-bottom:10px;animation:borderSoft 4s infinite}
+.card-h{font-size:13px;font-weight:700;color:var(--gold);margin-bottom:13px;display:flex;align-items:center;gap:6px}
+.ad-box{background:var(--card);border:1px solid;border-radius:18px;padding:18px;text-align:center;margin-bottom:10px;animation:borderSoft 4s infinite,glowSoft 4s infinite}
+.ad-pts{font-size:32px;font-weight:800;color:var(--gold)}
+.ad-sub{font-size:12px;color:rgba(255,255,255,0.35);margin-bottom:6px}
+.ad-btn{width:100%;padding:14px;border:1px solid;border-radius:14px;font-size:15px;font-weight:700;cursor:pointer;color:#fff;background:var(--card2);margin-top:12px;animation:borderSoft 4s infinite;transition:transform 0.15s,opacity 0.2s}
+.ad-btn:active{transform:scale(0.97)}
+.ad-btn:disabled{opacity:0.3;animation:none;border-color:var(--border);cursor:not-allowed}
+.ad-info{font-size:11px;color:rgba(255,255,255,0.25);margin-top:7px}
+.task{display:flex;justify-content:space-between;align-items:center;background:var(--card2);border:1px solid var(--border);border-radius:14px;padding:13px;margin-bottom:8px;cursor:pointer;transition:all 0.2s}
+.task:active{transform:scale(0.98)}
+.task.done{opacity:0.25;pointer-events:none}
+.task-l{display:flex;align-items:center;gap:11px}
+.task-ico{font-size:26px}
+.task-name{font-size:13px;font-weight:600}
+.task-desc{font-size:11px;color:rgba(255,255,255,0.3);margin-top:1px}
+.badge{padding:5px 10px;border-radius:8px;font-size:12px;font-weight:700;background:rgba(245,166,35,0.12);border:1px solid rgba(245,166,35,0.3);color:var(--gold);white-space:nowrap}
+.ref-box{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:12px;font-size:12px;color:rgba(120,180,255,0.9);word-break:break-all;margin:10px 0;line-height:1.6}
+.btn{width:100%;padding:13px;border-radius:13px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;transition:transform 0.15s;border:1px solid}
+.btn:active{transform:scale(0.97)}
+.btn-gold{color:#000;background:var(--gold);border-color:var(--gold)}
+.btn-ghost{color:rgba(255,255,255,0.6);background:transparent;border-color:var(--border)}
+.ticker-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;margin-bottom:10px;overflow:hidden}
+.ticker-label{font-size:10px;color:rgba(255,255,255,0.3);margin-bottom:4px}
+.ticker-track{white-space:nowrap;animation:slideLeft 20s linear infinite;font-size:12px;color:var(--gold)}
+.bal-card{background:var(--card);border:1px solid;border-radius:18px;padding:20px;text-align:center;margin-bottom:10px;animation:borderSoft 4s infinite,glowSoft 4s infinite}
+.w-input{width:100%;padding:13px;background:var(--card2);border:1px solid var(--border);border-radius:12px;color:#fff;font-size:14px;margin:8px 0;outline:none}
+.info-r{font-size:12px;color:rgba(255,255,255,0.3);padding:4px 0;display:flex;align-items:center;gap:6px}
+.lang-g{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.lang-i{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center;cursor:pointer;font-size:13px;transition:all 0.2s}
+.lang-i.on{border-color:var(--gold);background:rgba(245,166,35,0.08);color:var(--gold)}
+.nav{position:fixed;bottom:0;width:100%;background:rgba(14,14,14,0.97);backdrop-filter:blur(20px);border-top:1px solid var(--border);display:flex;justify-content:space-around;padding:8px 0 14px;z-index:100}
+.nb{background:none;border:none;color:rgba(255,255,255,0.3);font-size:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 12px;transition:all 0.2s}
+.nb .ic{font-size:22px;transition:all 0.3s}
+.nb.on{color:var(--gold)}
+.nb.on .ic{filter:drop-shadow(0 0 6px rgba(245,166,35,0.6))}
+.notif{position:fixed;top:16px;left:50%;transform:translateX(-50%);padding:10px 20px;border-radius:14px;font-size:13px;font-weight:700;z-index:999;display:none;color:#000;background:var(--gold);white-space:nowrap;animation:notifIn 0.3s ease}
+</style>
+</head>
+<body>
+
+<div class="notif" id="notif"></div>
+
+<!-- HOME -->
+<div id="pg-home" class="page active">
+  <div class="topbar">
+    <div class="logo">⚡ Task<span>Earn</span></div>
+    <div class="id-chip" id="id-chip">ID: ···</div>
+  </div>
+  <div class="hero">
+    <div class="coin-wrap"><span class="coin-ico">🪙</span></div>
+    <div class="coin-num" id="coins">0</div>
+    <div class="coin-usdt" id="usdt1">≈ 0.0000 USDT</div>
+    <div class="prog-wrap"><div class="prog" id="prog" style="width:0%"></div></div>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="stat-n" id="s-ads">0</div><div class="stat-l" id="tl-ads">إعلانات</div></div>
+    <div class="stat"><div class="stat-n" id="s-refs">0</div><div class="stat-l" id="tl-refs">إحالات</div></div>
+    <div class="stat"><div class="stat-n" id="s-tasks">0</div><div class="stat-l" id="tl-tasks">مهام</div></div>
+  </div>
+  <div class="ad-box">
+    <div class="ad-sub" id="tl-earn">شاهد إعلاناً واكسب نقاط!</div>
+    <div class="ad-pts">+3 <span style="font-size:16px" id="tl-pts">نقاط</span></div>
+    <button class="ad-btn" id="ad-btn" onclick="watchAd()">📺 <span id="tl-watch">شاهد الإعلان</span></button>
+    <div class="ad-info" id="ad-info"></div>
+  </div>
+  <div class="card">
+    <div class="card-h">📋 <span id="tl-daily">المهام</span></div>
+    <div class="task" id="tk-ch">
+      <div class="task-l">
+        <div class="task-ico">📢</div>
+        <div><div class="task-name" id="tl-join">اشترك في قناة TaskEarn</div><div class="task-desc" id="tl-joind">اشترك واكسب 50 نقطة</div></div>
+      </div>
+      <div class="badge">+50 🪙</div>
+    </div>
+    <div class="task" id="tk-sh" onclick="shareTask()">
+      <div class="task-l">
+        <div class="task-ico">🔗</div>
+        <div><div class="task-name" id="tl-share">شارك رابط الإحالة</div><div class="task-desc" id="tl-shared">100 نقطة لكل صديق ينضم</div></div>
+      </div>
+      <div class="badge">+100 🪙</div>
+    </div>
+  </div>
+</div>
+
+<!-- REFERRAL -->
+<div id="pg-ref" class="page">
+  <div class="card">
+    <div class="card-h">👥 <span id="tl-reft">نظام الإحالة</span></div>
+    <p style="color:rgba(255,255,255,0.4);font-size:13px;margin-bottom:10px" id="tl-refd">ادعو أصدقاءك واكسب 100 نقطة لكل صديق ينضم!</p>
+    <div class="ref-box" id="ref-link">جاري التحميل...</div>
+    <button class="btn btn-gold" onclick="copyRef()" id="tl-copy">📋 نسخ الرابط</button>
+    <button class="btn btn-ghost" onclick="shareRef()" id="tl-sref">📤 مشاركة</button>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="stat-n" id="r-num">0</div><div class="stat-l" id="tl-rnum">إحالات</div></div>
+    <div class="stat"><div class="stat-n" id="r-pts">0</div><div class="stat-l">نقاط</div></div>
+    <div class="stat"><div class="stat-n" id="r-usd">0.00</div><div class="stat-l">USDT</div></div>
+  </div>
+</div>
+
+<!-- WITHDRAW -->
+<div id="pg-wd" class="page">
+  <div class="ticker-wrap">
+    <div class="ticker-label">🔴 عمليات سحب حديثة</div>
+    <div class="ticker-track" id="ticker">جاري التحميل...</div>
+  </div>
+  <div class="bal-card">
+    <div style="color:rgba(255,255,255,0.4);font-size:12px" id="tl-bal">رصيدك الحالي</div>
+    <div class="coin-num" style="font-size:38px;margin-top:6px" id="coins2">0</div>
+    <div class="coin-usdt" id="usdt2">≈ 0.0000 USDT</div>
+    <div style="font-size:11px;color:rgba(255,255,255,0.2);margin-top:6px">1000 نقطة = 0.1 USDT</div>
+  </div>
+  <div class="card">
+    <div class="card-h">💸 <span id="tl-wdt">سحب المكافآت</span></div>
+    <div style="font-size:12px;color:rgba(255,255,255,0.4);margin-bottom:6px" id="tl-wall">عنوان المحفظة (TRC20/TON)</div>
+    <input class="w-input" type="text" id="wallet" placeholder="أدخل عنوان محفظتك...">
+    <button class="btn btn-gold" onclick="withdraw()" id="tl-wdb">💸 سحب</button>
+  </div>
+  <div class="card">
+    <div class="info-r">⚠️ <span id="tl-min">الحد الأدنى: 1000 نقطة</span></div>
+    <div class="info-r">⏱️ <span id="tl-time">وقت المعالجة: 24-48 ساعة</span></div>
+    <div class="info-r">💡 الربح الصافي: 100% لك</div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="pg-set" class="page">
+  <div class="card">
+    <div class="card-h">🌍 <span id="tl-lang">اللغة</span></div>
+    <div class="lang-g">
+      <div class="lang-i on" onclick="setLang('ar',this)">🇸🇦 العربية</div>
+      <div class="lang-i" onclick="setLang('en',this)">🇬🇧 English</div>
+      <div class="lang-i" onclick="setLang('fr',this)">🇫🇷 Français</div>
+      <div class="lang-i" onclick="setLang('ru',this)">🇷🇺 Русский</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-h">📊 <span id="tl-rate">معدل التحويل</span></div>
+    <div style="text-align:center;font-size:18px;font-weight:700;color:var(--gold);margin:8px 0">1000 🪙 = 0.1 USDT</div>
+  </div>
+  <div class="card">
+    <div class="card-h">🆔 <span id="tl-myid">معرفك</span></div>
+    <div style="text-align:center;font-size:16px;font-weight:700;color:var(--gold)" id="my-id">-</div>
+  </div>
+</div>
+
+<nav class="nav">
+  <button class="nb on" onclick="go('home',this)"><span class="ic">🏠</span><span id="nl-home">الرئيسية</span></button>
+  <button class="nb" onclick="go('ref',this)"><span class="ic">👥</span><span id="nl-ref">الإحالة</span></button>
+  <button class="nb" onclick="go('wd',this)"><span class="ic">💰</span><span id="nl-wd">السحب</span></button>
+  <button class="nb" onclick="go('set',this)"><span class="ic">⚙️</span><span id="nl-set">الإعدادات</span></button>
+</nav>
+
+<script>
+const SB='https://xdsqoflkdbcsbbqonfrv.supabase.co';
+const SK='sb_publishable_yyThqbzPOCoqrAcDmY60gw_-0QZSzJt';
+const RATE=0.0001;
+const CHANNEL='https://t.me/gxhxd';
+const BOT='earntaskpro_bot';
+const VERCEL='https://taskearnbot.vercel.app';
+let coins=0,uid=null,ads=0,refs=0,tasks=0,lang='ar';
+let channelDone=false,shareDone=false;
+
+const fakeWithdrawals=[
+  'أحمد س. سحب 0.5 USDT','محمد ع. سحب 1.2 USDT','سارة م. سحب 0.8 USDT',
+  'علي ح. سحب 2.0 USDT','فاطمة ك. سحب 0.3 USDT','Omar سحب 1.5 USDT',
+  'Yusuf سحب 0.7 USDT','نورا ف. سحب 0.9 USDT','Hassan سحب 3.0 USDT',
+  'ليلى ب. سحب 0.4 USDT','كريم ط. سحب 1.1 USDT','Aisha سحب 0.6 USDT'
+];
+
+const TX={
+ar:{home:'الرئيسية',ref:'الإحالة',wd:'السحب',set:'الإعدادات',ads:'إعلانات',refs:'إحالات',tasks:'مهام',earn:'شاهد إعلاناً واكسب نقاط!',pts:'نقاط',watch:'شاهد الإعلان',daily:'المهام',join:'اشترك في قناة TaskEarn',joind:'اشترك واكسب 50 نقطة',share:'شارك رابط الإحالة',shared:'100 نقطة لكل صديق ينضم',reft:'نظام الإحالة',refd:'ادعو أصدقاءك واكسب 100 نقطة لكل صديق ينضم!',copy:'📋 نسخ الرابط',sref:'📤 مشاركة',rnum:'إحالات',bal:'رصيدك الحالي',wall:'عنوان المحفظة (TRC20/TON)',wdt:'سحب المكافآت',wdb:'💸 سحب',min:'الحد الأدنى: 1000 نقطة',time:'وقت المعالجة: 24-48 ساعة',lang:'اللغة',rate:'معدل التحويل',myid:'معرفك',adw:'إعلان'},
+en:{home:'Home',ref:'Referral',wd:'Withdraw',set:'Settings',ads:'Ads',refs:'Refs',tasks:'Tasks',earn:'Watch ad & earn points!',pts:'pts',watch:'Watch Ad',daily:'Tasks',join:'Join TaskEarn Channel',joind:'Subscribe & earn 50 pts',share:'Share Referral Link',shared:'100 pts per friend',reft:'Referral System',refd:'Invite friends & earn 100 pts each!',copy:'📋 Copy Link',sref:'📤 Share',rnum:'Referrals',bal:'Your Balance',wall:'Wallet Address (TRC20/TON)',wdt:'Withdraw',wdb:'💸 Withdraw',min:'Minimum: 1000 points',time:'Processing: 24-48h',lang:'Language',rate:'Exchange Rate',myid:'Your ID',adw:'ad'},
+fr:{home:'Accueil',ref:'Parrainage',wd:'Retrait',set:'Paramètres',ads:'Pubs',refs:'Refs',tasks:'Tâches',earn:'Voir pub & gagner!',pts:'pts',watch:'Voir pub',daily:'Tâches',join:'Rejoindre TaskEarn',joind:'Abonnez-vous & gagnez 50 pts',share:'Partager lien',shared:'100 pts par ami',reft:'Parrainage',refd:'Invitez & gagnez 100 pts!',copy:'📋 Copier',sref:'📤 Partager',rnum:'Parrainages',bal:'Votre solde',wall:'Adresse',wdt:'Retrait',wdb:'💸 Retirer',min:'Min: 1000 pts',time:'Délai: 24-48h',lang:'Langue',rate:'Taux',myid:'Votre ID',adw:'pub'},
+ru:{home:'Главная',ref:'Рефералы',wd:'Вывод',set:'Настройки',ads:'Реклама',refs:'Рефералы',tasks:'Задания',earn:'Смотри & зарабатывай!',pts:'очков',watch:'Смотреть',daily:'Задания',join:'Подписаться на TaskEarn',joind:'Подпишись & получи 50 очков',share:'Поделиться ссылкой',shared:'100 очков за друга',reft:'Рефералы',refd:'Приглашай & получай 100 очков!',copy:'📋 Копировать',sref:'📤 Поделиться',rnum:'Рефералы',bal:'Ваш баланс',wall:'Адрес кошелька',wdt:'Вывод',wdb:'💸 Вывести',min:'Минимум: 1000 очков',time:'Обработка: 24-48ч',lang:'Язык',rate:'Курс',myid:'Ваш ID',adw:'реклама'}
+};
+
+function toast(m,dur=2500){
+  const n=document.getElementById('notif');
+  n.textContent=m;n.style.display='block';
+  setTimeout(()=>n.style.display='none',dur);
+}
+
+function setLang(l,el){
+  lang=l;
+  document.querySelectorAll('.lang-i').forEach(i=>i.classList.remove('on'));
+  if(el)el.classList.add('on');
+  document.documentElement.dir=l==='ar'?'rtl':'ltr';
+  const t=TX[l];
+  const m={
+    'nl-home':'home','nl-ref':'ref','nl-wd':'wd','nl-set':'set',
+    'tl-ads':'ads','tl-refs':'refs','tl-tasks':'tasks','tl-earn':'earn',
+    'tl-pts':'pts','tl-watch':'watch','tl-daily':'daily','tl-join':'join',
+    'tl-joind':'joind','tl-share':'share','tl-shared':'shared','tl-reft':'reft',
+    'tl-refd':'refd','tl-copy':'copy','tl-sref':'sref','tl-rnum':'rnum',
+    'tl-bal':'bal','tl-wall':'wall','tl-wdt':'wdt','tl-wdb':'wdb',
+    'tl-min':'min','tl-time':'time','tl-lang':'lang','tl-rate':'rate','tl-myid':'myid'
+  };
+  Object.entries(m).forEach(([id,k])=>{const e=document.getElementById(id);if(e)e.textContent=t[k]});
+  updAds();
+}
+
+function go(pg,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
+  document.getElementById('pg-'+pg).classList.add('active');
+  if(btn)btn.classList.add('on');
+}
+
+function updCoins(){
+  const u=(coins*RATE).toFixed(4);
+  ['coins','coins2'].forEach(id=>document.getElementById(id).textContent=coins);
+  ['usdt1','usdt2'].forEach(id=>document.getElementById(id).textContent='≈ '+u+' USDT');
+  document.getElementById('prog').style.width=Math.min((coins%1000)/10,100)+'%';
+  document.getElementById('s-ads').textContent=ads;
+  document.getElementById('s-refs').textContent=refs;
+  document.getElementById('s-tasks').textContent=tasks;
+  document.getElementById('r-num').textContent=refs;
+  document.getElementById('r-pts').textContent=refs*100;
+  document.getElementById('r-usd').textContent=(refs*100*RATE).toFixed(2);
+}
+
+function updAds(){
+  document.getElementById('ad-info').textContent=ads>0?ads+' '+TX[lang].adw:'';
+}
+
+async function save(){
+  if(!uid)return;
+  await fetch(`${SB}/rest/v1/users?telegram_id=eq.${uid}`,{
+    method:'PATCH',
+    headers:{'Content-Type':'application/json','apikey':SK,'Authorization':'Bearer '+SK},
+    body:JSON.stringify({coins,ads_watched:ads,tasks_done:tasks})
+  });
+}
+
+async function watchAd(){
+  const btn=document.getElementById('ad-btn');
+  btn.disabled=true;
+  btn.innerHTML='⏳ ...';
+  try{
+    if(window.Adsgram){
+      const AdController=window.Adsgram.init({blockId:'bot-35140'});
+      await AdController.show();
+    } else {
+      await new Promise(r=>setTimeout(r,2000));
+    }
+    coins+=3;ads++;
+    updCoins();updAds();
+    await save();
+    toast('🎉 +3 '+TX[lang].pts);
+  }catch(e){
+    toast(lang==='ar'?'⚠️ لا يوجد إعلان الآن':'⚠️ No ad available');
+  }
+  btn.disabled=false;
+  btn.innerHTML='📺 <span>'+TX[lang].watch+'</span>';
+}
+
+async function verifyChannel(){
+  if(channelDone){
+    toast(lang==='ar'?'✅ أنت مشترك بالفعل!':'✅ Already subscribed!');
+    return;
+  }
+  toast(lang==='ar'?'⏳ جاري التحقق...':'⏳ Checking...');
+  try{
+    const res=await fetch(`${VERCEL}/api/verify?uid=${uid}`);
+    const d=await res.json();
+    if(d.ok){
+      channelDone=true;
+      if(d.coins) coins=d.coins;
+      tasks++;
+      updCoins();
+      document.getElementById('tk-ch').classList.add('done');
+      const vb=document.getElementById('verify-btn');
+      if(vb)vb.remove();
+      toast('🎉 +50 '+TX[lang].pts);
+    } else {
+      toast(lang==='ar'?'❌ لسه مشتركتش! اشترك الأول':'❌ Not subscribed yet!');
+    }
+  }catch(e){
+    toast(lang==='ar'?'❌ خطأ في التحقق':'❌ Verify error');
+  }
+}
+
+function shareTask(){
+  const link=`https://t.me/${BOT}?start=${uid}`;
+  window.Telegram.WebApp.openLink('https://t.me/share/url?url='+encodeURIComponent(link)+'&text='+encodeURIComponent('انضم لـ TaskEarn واكسب مكافآت! 🎁'));
+  if(!shareDone){
+    shareDone=true;
+    document.getElementById('tk-sh').classList.add('done');
+    toast(lang==='ar'?'تم مشاركة الرابط! انتظر الأصدقاء':'Link shared! Wait for friends');
+  }
+}
+
+function copyRef(){
+  navigator.clipboard.writeText(`https://t.me/${BOT}?start=${uid}`);
+  toast(lang==='ar'?'✅ تم النسخ!':'✅ Copied!');
+}
+
+function shareRef(){
+  const link=`https://t.me/${BOT}?start=${uid}`;
+  window.Telegram.WebApp.openLink('https://t.me/share/url?url='+encodeURIComponent(link)+'&text='+encodeURIComponent('انضم لـ TaskEarn واكسب مكافآت! 🎁'));
+}
+
+async function withdraw(){
+  const w=document.getElementById('wallet').value.trim();
+  if(!w){toast(lang==='ar'?'⚠️ أدخل عنوان المحفظة':'⚠️ Enter wallet');return;}
+  if(coins<1000){toast(lang==='ar'?'⚠️ تحتاج 1000 نقطة':'⚠️ Need 1000 pts');return;}
+  const usdt=(coins*RATE).toFixed(4);
+  try{
+    await fetch(`${SB}/rest/v1/withdrawals`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SK,'Authorization':'Bearer '+SK},
+      body:JSON.stringify({telegram_id:uid,wallet:w,coins,usdt,status:'pending'})
+    });
+    toast(lang==='ar'?'✅ تم إرسال طلب السحب!':'✅ Request sent!');
+    document.getElementById('wallet').value='';
+  }catch(e){toast(lang==='ar'?'خطأ في الإرسال':'Send error');}
+}
+
+function initTicker(){
+  const t=document.getElementById('ticker');
+  if(!t)return;
+  const items=fakeWithdrawals.map(w=>`<span style="margin:0 20px">💚 ${w}</span>`).join('');
+  t.innerHTML=items+items;
+}
+
+async function init(){
+  const tg=window.Telegram.WebApp;
+  tg.expand();
+  try{tg.setHeaderColor('#0e0e0e');}catch(e){}
+  const startParam=tg.initDataUnsafe?.start_param;
+  const u=tg.initDataUnsafe?.user;
+  if(u){
+    uid=u.id;
+    document.getElementById('id-chip').textContent='ID: '+uid;
+    document.getElementById('my-id').textContent=uid;
+    document.getElementById('ref-link').textContent=`https://t.me/${BOT}?start=${uid}`;
+
+    const res=await fetch(`${SB}/rest/v1/users?telegram_id=eq.${uid}&select=*`,{
+      headers:{'apikey':SK,'Authorization':'Bearer '+SK}
+    });
+    const d=await res.json();
+
+    if(d.length===0){
+      // مستخدم جديد
+      await fetch(`${SB}/rest/v1/users`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','apikey':SK,'Authorization':'Bearer '+SK},
+        body:JSON.stringify({telegram_id:uid,username:u.username||'',coins:0,ads_watched:0,tasks_done:0,refs:0,referred_by:startParam||null,is_member:false,channel_bonus:false})
+      });
+      // ✅ إحالة فورية لما حد جديد يفتح الـ Mini App
+      if(startParam && startParam!=uid){
+        const rr=await fetch(`${SB}/rest/v1/users?telegram_id=eq.${startParam}&select=*`,{
+          headers:{'apikey':SK,'Authorization':'Bearer '+SK}
+        });
+        const rd=await rr.json();
+        if(rd.length>0){
+          await fetch(`${SB}/rest/v1/users?telegram_id=eq.${startParam}`,{
+            method:'PATCH',
+            headers:{'Content-Type':'application/json','apikey':SK,'Authorization':'Bearer '+SK},
+            body:JSON.stringify({coins:(rd[0].coins||0)+100,refs:(rd[0].refs||0)+1})
+          });
+        }
+      }
+    } else {
+      // مستخدم موجود
+      coins=d[0].coins||0;
+      ads=d[0].ads_watched||0;
+      tasks=d[0].tasks_done||0;
+      refs=d[0].refs||0;
+      channelDone=d[0].channel_bonus||false;
+      if(channelDone) document.getElementById('tk-ch').classList.add('done');
+      updCoins();updAds();
+    }
+
+    // زر مهمة القناة
+    document.getElementById('tk-ch').onclick=function(){
+      if(channelDone) return;
+      window.Telegram.WebApp.openLink(CHANNEL);
+      setTimeout(()=>{
+        if(!document.getElementById('verify-btn')){
+          const btn=document.createElement('button');
+          btn.id='verify-btn';
+          btn.className='btn btn-gold';
+          btn.style='width:calc(100% - 28px);position:fixed;bottom:75px;left:14px;z-index:200;padding:14px;border-radius:13px;font-size:14px;font-weight:700;cursor:pointer;border:none;';
+          btn.textContent='✅ تحقق من اشتراكي';
+          btn.onclick=verifyChannel;
+          document.body.appendChild(btn);
+          setTimeout(()=>{const b=document.getElementById('verify-btn');if(b)b.remove();},30000);
+        }
+      },1500);
+    };
+  }
+  initTicker();
+}
+
+init();
+</script>
+</body>
+</html>
